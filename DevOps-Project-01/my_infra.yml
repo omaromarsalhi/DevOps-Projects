@@ -1,0 +1,607 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Complete 3-Tier Infrastructure with Load Balancers'
+
+Parameters:
+  KeyName:
+    Type: String
+    Default: "devops-p1-keypair"
+    Description: "Name of an existing EC2 KeyPair to enable SSH access"
+  
+  InstanceType:
+    Type: String
+    Default: "t3.medium"
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+    Description: "EC2 instance type"
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: "Database master password (min 8 characters)"
+
+Resources:
+  # VPC
+  EC2VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: "default"
+      Tags:
+        - Key: "Name"
+          Value: "devops_p1_vpc"
+
+  # Internet Gateway
+  EC2InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: "devops_ig"
+
+  # Attach Internet Gateway to VPC
+  VPCGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref EC2VPC
+      InternetGatewayId: !Ref EC2InternetGateway
+
+  # Public Subnets
+  PublicSubnet1a:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: "10.0.1.0/24"
+      AvailabilityZone: "us-east-1a"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: "Name"
+          Value: "pub_sub_1a"
+
+  PublicSubnet1b:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: "10.0.4.0/24"
+      AvailabilityZone: "us-east-1b"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: "Name"
+          Value: "pub_sub_1b"
+
+  # Private Subnets - Group 1 (App Tier)
+  PrivateSubnet1a:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: "10.0.2.0/24"
+      AvailabilityZone: "us-east-1a"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: "Name"
+          Value: "prv1_sub_1a"
+
+  PrivateSubnet1b:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: "10.0.5.0/24"
+      AvailabilityZone: "us-east-1b"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: "Name"
+          Value: "prv1_sub_1b"
+
+  # Private Subnets - Group 2 (DB Tier)
+  PrivateSubnet2a:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: "10.0.3.0/24"
+      AvailabilityZone: "us-east-1a"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: "Name"
+          Value: "prv2_sub_1a"
+
+  PrivateSubnet2b:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: "10.0.6.0/24"
+      AvailabilityZone: "us-east-1b"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: "Name"
+          Value: "prv2_sub_1b"
+
+  # Elastic IP for NAT Gateway
+  NATGatewayEIP1b:
+    Type: "AWS::EC2::EIP"
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: "Name"
+          Value: "natgt_1b_eip"
+
+  # NAT Gateway (only in 1b)
+  NATGateway1b:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt NATGatewayEIP1b.AllocationId
+      SubnetId: !Ref PublicSubnet1b
+      Tags:
+        - Key: "Name"
+          Value: "natgt_1b"
+
+  # Route Tables
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref EC2VPC
+      Tags:
+        - Key: "Name"
+          Value: "pub_rt"
+
+  PrivateRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref EC2VPC
+      Tags:
+        - Key: "Name"
+          Value: "prv_rt"
+
+  # Routes
+  PublicRoute:
+    Type: "AWS::EC2::Route"
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref EC2InternetGateway
+
+  PrivateRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NATGateway1b
+
+  # Route Table Associations - Public Subnets
+  PublicSubnet1aAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet1a
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet1bAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet1b
+      RouteTableId: !Ref PublicRouteTable
+
+  # Route Table Associations - Private Subnets
+  PrivateSubnet1aAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet1a
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2aAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet2a
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet1bAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet1b
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2bAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet2b
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Security Groups
+  PublicSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "pub_subs_sg"
+      GroupDescription: "Security group for public subnets"
+      VpcId: !Ref EC2VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+          Description: "SSH access"
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+          Description: "HTTP access"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+          Description: "HTTPS access"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "Name"
+          Value: "pub_subs_sg"
+
+  PrivateSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "prv_sub_sg"
+      GroupDescription: "Security group for private subnets"
+      VpcId: !Ref EC2VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref PublicSecurityGroup
+          Description: "SSH from public subnets"
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref PublicSecurityGroup
+          Description: "Tomcat from web servers"
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: "Tomcat from ALB"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "Name"
+          Value: "prv_sub_sg"
+
+  RDSSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "rds_sg"
+      GroupDescription: "Security group for RDS database"
+      VpcId: !Ref EC2VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref PrivateSecurityGroup
+          Description: "MySQL access from app servers"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "Name"
+          Value: "rds_sg"
+
+  ALBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "alb_sg"
+      GroupDescription: "Security group for Application Load Balancer"
+      VpcId: !Ref EC2VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+          Description: "HTTP access from internet"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+          Description: "HTTPS access from internet"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "Name"
+          Value: "alb_sg"
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: "devops-project-alb"
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1a
+        - !Ref PublicSubnet1b
+      Tags:
+        - Key: "Name"
+          Value: "devops-project-alb"
+
+  # Target Group for Web Servers
+  WebServerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      Name: "web-servers-tg"
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref EC2VPC
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      Tags:
+        - Key: "Name"
+          Value: "web-servers-tg"
+
+  # ALB Listener
+  ALBListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebServerTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Network Load Balancer for App Tier
+  NetworkLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: "devops-project-nlb"
+      Scheme: internal
+      Type: network
+      Subnets:
+        - !Ref PrivateSubnet1a
+        - !Ref PrivateSubnet1b
+      Tags:
+        - Key: "Name"
+          Value: "devops-project-nlb"
+
+  # Target Group for App Servers
+  AppServerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      Name: "app-servers-tg"
+      Port: 8080
+      Protocol: TCP
+      VpcId: !Ref EC2VPC
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckProtocol: TCP
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Tags:
+        - Key: "Name"
+          Value: "app-servers-tg"
+
+  # NLB Listener
+  NLBListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AppServerTargetGroup
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: 8080
+      Protocol: TCP
+
+  # Web Server Instances (basic, no launch templates)
+  WebServer1:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-00ca32bbc84273381"  # Amazon Linux 2023
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref PublicSubnet1a
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: "Name"
+          Value: "web-server-1a"
+        - Key: "Tier"
+          Value: "Web"
+
+  WebServer2:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-00ca32bbc84273381"  # Amazon Linux 2023
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref PublicSubnet1b
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: "Name"
+          Value: "web-server-1b"
+        - Key: "Tier"
+          Value: "Web"
+
+  # App Server Instances (basic, no launch templates)
+  AppServer1:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-00ca32bbc84273381"  # Amazon Linux 2023
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref PrivateSecurityGroup
+      SubnetId: !Ref PrivateSubnet1a
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: "Name"
+          Value: "app-server-1a"
+        - Key: "Tier"
+          Value: "Application"
+
+  AppServer2:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-00ca32bbc84273381"  # Amazon Linux 2023
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref PrivateSecurityGroup
+      SubnetId: !Ref PrivateSubnet1b
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: "Name"
+          Value: "app-server-1b"
+        - Key: "Tier"
+          Value: "Application"
+
+  # Bastion Host
+  BastionHost:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-00ca32bbc84273381"  # Amazon Linux 2023
+      InstanceType: t3.medium
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref PublicSubnet1a
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: "Name"
+          Value: "bastion-host"
+
+  # IAM Role for EC2 instances
+  EC2Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "devops-project-ec2-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub "arn:aws:s3:::devops-project-artifacts-*/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::devops-project-artifacts-*"
+
+  # Instance Profile
+  InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: "devops-project-instance-profile"
+      Roles:
+        - !Ref EC2Role
+
+  # DB Subnet Group
+  DBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupName: "devops-db-subnet-group"
+      DBSubnetGroupDescription: "Subnet group for RDS database"
+      SubnetIds:
+        - !Ref PrivateSubnet2a
+        - !Ref PrivateSubnet2b
+      Tags:
+        - Key: "Name"
+          Value: "devops-db-subnet-group"
+
+  # RDS Database
+  RDSDatabase:
+    Type: "AWS::RDS::DBInstance"
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: "loginapp"
+      DBInstanceClass: "db.t3.micro"
+      Engine: "mysql"
+      EngineVersion: "8.0.42"
+      MasterUsername: "admin"
+      MasterUserPassword: !Ref DBPassword
+      AllocatedStorage: 20
+      StorageType: "gp3"
+      StorageEncrypted: false
+      MultiAZ: false
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: 7
+      DeletionProtection: false
+      Tags:
+        - Key: "Name"
+          Value: "loginapp-db"
+
+Outputs:
+  VPCId:
+    Description: "VPC ID"
+    Value: !Ref EC2VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPC-ID"
+
+  PublicSubnets:
+    Description: "Public Subnets"
+    Value: !Join [",", [!Ref PublicSubnet1a, !Ref PublicSubnet1b]]
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnets"
+
+  PrivateSubnets:
+    Description: "Private Subnets"
+    Value: !Join [",", [!Ref PrivateSubnet1a, !Ref PrivateSubnet1b, !Ref PrivateSubnet2a, !Ref PrivateSubnet2b]]
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnets"
+
+  ApplicationLoadBalancerDNS:
+    Description: "Application Load Balancer DNS Name"
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-ALB-DNS"
+
+  NetworkLoadBalancerDNS:
+    Description: "Network Load Balancer DNS Name"
+    Value: !GetAtt NetworkLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-NLB-DNS"
+
+  BastionHostPublicIP:
+    Description: "Bastion Host Public IP"
+    Value: !GetAtt BastionHost.PublicIp
+    Export:
+      Name: !Sub "${AWS::StackName}-Bastion-IP"
+
+  RDSEndpoint:
+    Description: "RDS Database Endpoint"
+    Value: !GetAtt RDSDatabase.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-RDS-Endpoint"

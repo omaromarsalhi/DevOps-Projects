@@ -1,0 +1,33 @@
+---
+- name: Test connectivity to all servers
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Print server information
+      debug:
+        msg: "Connected to {{ inventory_hostname }} - OS: {{ ansible_distribution }}"
+    
+    - name: Check uptime
+      command: uptime
+      register: uptime_result
+    
+    - name: Display uptime
+      debug:
+        msg: "Uptime: {{ uptime_result.stdout }}"
+
+    - name: Check free memory
+      command: free -m
+      register: memory_result
+    
+    - name: Display memory info
+      debug:
+        msg: "{{ memory_result.stdout_lines }}"
+
+    - name: Test sudo access
+      command: whoami
+      become: yes
+      register: sudo_test
+    
+    - name: Display sudo test
+      debug:
+        msg: "Sudo test: {{ sudo_test.stdout }}"
