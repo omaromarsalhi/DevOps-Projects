@@ -1,0 +1,79 @@
+---
+- name: Install Java and Tomcat on app servers
+  hosts: appservers
+  become: yes
+  vars:
+    tomcat_version: 11.0.0-M20
+    tomcat_major: 11
+    tomcat_install_dir: /opt/tomcat
+  tasks:
+
+    - name: Install Java (Amazon Corretto 17)
+      yum:
+        name: java-17-amazon-corretto
+        state: present
+
+    - name: Create tomcat group
+      group:
+        name: tomcat
+        state: present
+
+    - name: Create tomcat user
+      user:
+        name: tomcat
+        group: tomcat
+        home: "{{ tomcat_install_dir }}"
+        shell: /bin/false
+        state: present
+
+    - name: Get Tomcat 9 download page
+      uri:
+        url: https://dlcdn.apache.org/tomcat/tomcat-9/
+        return_content: yes
+      register: tomcat9_page
+
+    - name: Extract latest Tomcat 9 version
+      set_fact:
+        tomcat_version: "{{ tomcat9_page.content | regex_findall('v[0-9]+\\.[0-9]+\\.[0-9]+') | sort | last | regex_replace('^v','') }}"
+
+    - name: Download latest Tomcat 9
+      get_url:
+        url: "https://dlcdn.apache.org/tomcat/tomcat-9/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+
+    - name: Extract Tomcat
+      unarchive:
+        src: /tmp/apache-tomcat-{{ tomcat_version }}.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Remove existing /opt/tomcat directory if present
+      file:
+        path: "{{ tomcat_install_dir }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Symlink Tomcat directory
+      file:
+        src: /opt/apache-tomcat-{{ tomcat_version }}
+        dest: "{{ tomcat_install_dir }}"
+        state: link
+        force: yes
+
+    - name: Change ownership of Tomcat directory
+      file:
+        path: "{{ tomcat_install_dir }}"
+        state: directory
+        recurse: yes
+        owner: tomcat
+        group: tomcat
+
+    - name: Start Tomcat
+      shell: "{{ tomcat_install_dir }}/bin/startup.sh"
+      args:
+        chdir: "{{ tomcat_install_dir }}/bin"
+      become_user: tomcat
+      environment:
+        JAVA_HOME: /usr/lib/jvm/jre
+
+    
