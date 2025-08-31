@@ -1,0 +1,180 @@
+---
+- name: Setup Ansible, AWS CLI, and SSH configuration on bastion host
+  hosts: bastion
+  become: true
+  gather_facts: true
+
+  tasks:
+  
+    - name: Update system packages
+      dnf:
+        name: "*"
+        state: latest
+      tags: [system]
+
+    - name: Install required packages
+      dnf:
+        name: "{{ required_packages }}"
+        state: present
+      tags: [packages]
+
+    - name: Check if pip3 is available
+      command: pip3 --version
+      register: pip3_check
+      failed_when: false
+      changed_when: false
+      tags: [pip]
+
+    - name: Install pip3 manually if not available
+      block:
+        - name: Download get-pip.py
+          get_url:
+            url: https://bootstrap.pypa.io/get-pip.py
+            dest: /tmp/get-pip.py
+            mode: '0644'
+
+        - name: Install pip3 manually
+          command: python3 /tmp/get-pip.py --user
+          become_user: ec2-user
+
+        - name: Clean up get-pip.py
+          file:
+            path: /tmp/get-pip.py
+            state: absent
+      when: pip3_check.rc != 0
+      tags: [pip]
+
+    - name: Add Python bin to PATH for ec2-user
+      lineinfile:
+        path: /home/ec2-user/.bashrc
+        line: 'export PATH=$PATH:~/.local/bin'
+        create: true
+        owner: ec2-user
+        group: ec2-user
+      tags: [environment]
+
+    - name: Download AWS CLI v2
+      get_url:
+        url: "{{ aws_cli_url }}"
+        dest: /tmp/awscliv2.zip
+        timeout: 60
+      tags: [awscli]
+
+    - name: Extract AWS CLI
+      unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp/
+        remote_src: true
+        creates: /tmp/aws
+      tags: [awscli]
+
+    - name: Install AWS CLI
+      command: /tmp/aws/install
+      args:
+        creates: /usr/local/bin/aws
+      tags: [awscli]
+
+    - name: Clean up AWS CLI installation files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/awscliv2.zip
+        - /tmp/aws
+      tags: [awscli, cleanup]
+
+    - name: Install Python packages for ec2-user
+      pip:
+        name: "{{ pip_packages }}"
+        executable: pip3
+        extra_args: --user
+      become_user: ec2-user
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/ec2-user/.local/bin"
+      tags: [ansible]
+
+    - name: Check if ansible is installed
+      stat:
+        path: /home/ec2-user/.local/bin/ansible
+      register: ansible_installed
+      tags: [ansible]
+
+    - name: Install Ansible collections (optional)
+      command: /home/ec2-user/.local/bin/ansible-galaxy collection install amazon.aws
+      become_user: ec2-user
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/ec2-user/.local/bin"
+      when: ansible_installed.stat.exists
+      ignore_errors: true
+      tags: [ansible, collections]
+
+    - name: Create SSH directory for ec2-user
+      file:
+        path: /home/ec2-user/.ssh
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: '0700'
+      tags: [ssh]
+
+    - name: Create AWS config directory for ec2-user
+      file:
+        path: /home/ec2-user/.aws
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: '0700'
+      tags: [aws-config]
+
+    - name: Verify AWS CLI installation
+      command: aws --version
+      register: aws_version
+      changed_when: false
+      tags: [verification]
+
+    - name: Verify Python installation
+      command: python3 --version
+      register: python_version
+      changed_when: false
+      tags: [verification]
+
+    - name: Verify pip3 installation
+      command: pip3 --version
+      register: pip_version
+      changed_when: false
+      become_user: ec2-user
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/ec2-user/.local/bin"
+      tags: [verification]
+
+    - name: Verify Ansible installation
+      command: /home/ec2-user/.local/bin/ansible --version
+      register: ansible_version
+      changed_when: false
+      become_user: ec2-user
+      when: ansible_installed.stat.exists
+      tags: [verification]
+
+    - name: Display installation results
+      debug:
+        msg:
+          - "==================================="
+          - "INSTALLATION VERIFICATION"
+          - "==================================="
+          - "AWS CLI: {{ aws_version.stdout }}"
+          - "Python: {{ python_version.stdout }}"
+          - "pip3: {{ pip_version.stdout }}"
+          - "Ansible: {{ ansible_version.stdout | default('Not installed or not found') }}"
+          - "==================================="
+          - "NEXT STEPS:"
+          - "1. Configure AWS CLI: aws configure"
+          - "2. Copy SSH key to /home/ec2-user/.ssh/devops-p1-keypair.pem"
+          - "3. Set key permissions: chmod 400 ~/.ssh/devops-p1-keypair.pem"
+          - "4. Test Ansible: ansible --version"
+          - "==================================="
+      tags: [verification]
+
+  handlers:
+    - name: Source bashrc
+      shell: source /home/ec2-user/.bashrc
+      become_user: ec2-user

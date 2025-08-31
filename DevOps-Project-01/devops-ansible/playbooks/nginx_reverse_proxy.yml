@@ -1,0 +1,50 @@
+---
+- name: Install and configure Nginx as reverse proxy on web servers
+  hosts: webservers
+  become: true
+  gather_facts: true
+  
+  tasks:
+    - name: Install Nginx
+      dnf:
+        name: nginx
+        state: present
+
+    - name: Remove default Nginx configuration
+      file:
+        path: /etc/nginx/conf.d/default.conf
+        state: absent
+      notify: Reload Nginx
+
+    - name: Configure Nginx as reverse proxy to app servers
+      template:
+        src: ../templates/nginx_reverse_proxy.conf.j2
+        dest: "{{ nginx_conf_path }}"
+        mode: '0644'
+        backup: true
+      notify: Reload Nginx
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_syntax
+      changed_when: false
+
+    - name: Start and enable Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Verify Nginx is responding
+      uri:
+        url: "http://localhost/health"
+        method: GET
+        status_code: 200
+      retries: 3
+      delay: 5
+
+  handlers:
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded

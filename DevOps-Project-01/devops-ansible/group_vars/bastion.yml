@@ -1,0 +1,13 @@
+---
+# Variables specific to bastion host
+repo_dest: /home/ec2-user
+java_repo_name: Java-Login-App
+work_dir: "{{ repo_dest }}/{{ java_repo_name }}"
+
+# Build settings
+maven_opts: "-Xmx1024m"
+skip_tests: true
+
+# MySQL client package
+mysql_packages:
+  - mariadb105

@@ -1,0 +1,23 @@
+---
+# Variables specific to application servers (Tomcat)
+tomcat_major: 9
+tomcat_install_dir: /opt/tomcat
+tomcat_user: tomcat
+tomcat_group: tomcat
+tomcat_service_name: tomcat
+tomcat_webapps: "{{ tomcat_install_dir }}/webapps"
+
+# JVM settings
+tomcat_heap_min: 512m
+tomcat_heap_max: 1024m
+tomcat_port: 8080
+tomcat_shutdown_port: 8005
+tomcat_ajp_port: 8009
+
+# Performance settings
+java_opts:
+  - "-Xms{{ tomcat_heap_min }}"
+  - "-Xmx{{ tomcat_heap_max }}"
+  - "-XX:+UseG1GC"
+  - "-XX:MaxGCPauseMillis=200"
+  - "-Dfile.encoding=UTF-8"

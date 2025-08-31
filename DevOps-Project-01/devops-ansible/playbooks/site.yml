@@ -1,7 +1,29 @@
 ---
+# Main deployment playbook for Java 3-tier application
+
+# Optional: Setup environment (run with --tags setup_env)
+- name: Setup Ansible environment on bastion
+  import_playbook: setup_environment.yml
+  tags: [setup_env, never]
+
 - name: Test connectivity to all hosts
   hosts: all
   gather_facts: false
   tasks:
     - name: Ping each host
       ping:
+
+- name: Setup database schema
+  import_playbook: setup_database.yml
+
+- name: Install and configure Tomcat
+  import_playbook: install_tomcat.yml
+
+- name: Build and upload application
+  import_playbook: build_and_upload_war.yml
+
+- name: Deploy application to Tomcat
+  import_playbook: deploy_from_s3.yml
+
+- name: Configure Nginx load balancer
+  import_playbook: nginx_reverse_proxy.yml

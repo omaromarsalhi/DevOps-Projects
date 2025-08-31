@@ -1,0 +1,62 @@
+---
+- name: Install MySQL client and setup database with Employee table
+  hosts: bastion
+  become: true
+
+  tasks:
+    - name: Install MySQL client
+      dnf:
+        name: "{{ mysql_packages }}"
+        state: present
+
+    - name: Test network connectivity to RDS
+      wait_for:
+        host: "{{ db_host }}"
+        port: 3306
+        timeout: "{{ connection_timeout }}"
+        msg: "Cannot connect to {{ db_host }}:3306"
+
+    - name: Test database authentication
+      shell: |
+        timeout {{ command_timeout }} mysql -h {{ db_host }} -u {{ db_user }} --password='{{ db_password }}' --connect-timeout={{ connection_timeout }} -e "SELECT 1;" 2>/dev/null
+      register: db_auth_test
+      changed_when: false
+
+    - name: Create loginapp database
+      shell: |
+        timeout {{ command_timeout }} mysql -h {{ db_host }} -u {{ db_user }} --password='{{ db_password }}' --connect-timeout={{ connection_timeout }} -e "CREATE DATABASE IF NOT EXISTS {{ db_name }};"
+      register: create_db_result
+
+    - name: Create Employee table
+      shell: |
+        timeout {{ command_timeout }} mysql -h {{ db_host }} -u {{ db_user }} --password='{{ db_password }}' --connect-timeout={{ connection_timeout }} {{ db_name }} -e "
+        CREATE TABLE IF NOT EXISTS Employee (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            first_name VARCHAR(50) NOT NULL,
+            last_name VARCHAR(50) NOT NULL,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            regdate DATE NOT NULL
+        );"
+      register: create_table_result
+
+    - name: Insert test user if not exists
+      shell: |
+        timeout {{ command_timeout }} mysql -h {{ db_host }} -u {{ db_user }} --password='{{ db_password }}' --connect-timeout={{ connection_timeout }} {{ db_name }} -e "
+        INSERT IGNORE INTO Employee (first_name, last_name, username, email, password, regdate) 
+        VALUES ('Test', 'User', 'testuser', 'test@example.com', 'password123', CURDATE());"
+      register: insert_user_result
+
+    - name: Verify database setup
+      shell: |
+        timeout {{ command_timeout }} mysql -h {{ db_host }} -u {{ db_user }} --password='{{ db_password }}' --connect-timeout={{ connection_timeout }} {{ db_name }} -e "
+        SELECT COUNT(*) as 'Total Users' FROM Employee;"
+      register: verify_result
+      changed_when: false
+
+    - name: Display setup results
+      debug:
+        msg: 
+          - "Database setup completed successfully!"
+          - "{{ verify_result.stdout_lines | last }}"

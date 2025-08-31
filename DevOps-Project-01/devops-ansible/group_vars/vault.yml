@@ -1,0 +1,20 @@
+# EXAMPLE Vault file - encrypt this with ansible-vault
+# 
+# To create encrypted vault:
+# ansible-vault create group_vars/vault.yml
+#
+# To edit encrypted vault:
+# ansible-vault edit group_vars/vault.yml
+#
+# To run playbooks with vault:
+# ansible-playbook playbooks/site.yml --ask-vault-pass
+
+---
+# Database credentials (ENCRYPT THESE!)
+vault_db_user: 
+vault_db_password: 
+
+# AWS credentials (ENCRYPT THESE! Better to use IAM roles)
+vault_aws_access_key_id: 
+vault_aws_secret_access_key: 
+vault_aws_session_token: 

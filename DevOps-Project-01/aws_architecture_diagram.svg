@@ -1,0 +1,166 @@
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e5e5" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1000" height="700" fill="url(#grid)"/>
+  
+  <!-- Internet -->
+  <ellipse cx="500" cy="50" rx="80" ry="25" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <text x="500" y="58" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">Internet</text>
+  
+  <!-- Internet Gateway -->
+  <rect x="460" y="100" width="80" height="40" fill="#FFD700" stroke="#FFA500" stroke-width="2"/>
+  <text x="500" y="125" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold">Internet GW</text>
+  
+  <!-- VPC Container -->
+  <rect x="50" y="170" width="900" height="510" fill="none" stroke="#2E8B57" stroke-width="3" stroke-dasharray="5,5"/>
+  <text x="60" y="190" font-family="Arial" font-size="14" font-weight="bold" fill="#2E8B57">VPC: devops_p1_vpc (10.0.0.0/16)</text>
+  
+  <!-- Public Subnet 1A -->
+  <rect x="80" y="220" width="200" height="150" fill="#E6FFE6" stroke="#228B22" stroke-width="2"/>
+  <text x="90" y="240" font-family="Arial" font-size="12" font-weight="bold" fill="#228B22">Public Subnet 1A</text>
+  <text x="90" y="255" font-family="Arial" font-size="10" fill="#228B22">10.0.1.0/24</text>
+  
+  <!-- Bastion Host -->
+  <rect x="95" y="270" width="60" height="40" fill="#FF6347" stroke="#DC143C" stroke-width="2"/>
+  <text x="125" y="285" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">Bastion</text>
+  <text x="125" y="297" text-anchor="middle" font-family="Arial" font-size="9">Host</text>
+  <text x="125" y="308" text-anchor="middle" font-family="Arial" font-size="8">Public IP</text>
+  
+  <!-- Web Server 1 -->
+  <rect x="170" y="270" width="60" height="40" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <text x="200" y="285" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">Web-1</text>
+  <text x="200" y="297" text-anchor="middle" font-family="Arial" font-size="9">Nginx</text>
+  <text x="200" y="308" text-anchor="middle" font-family="Arial" font-size="8">Public IP</text>
+  
+  <!-- Public Subnet 1B -->
+  <rect x="320" y="220" width="200" height="150" fill="#E6FFE6" stroke="#228B22" stroke-width="2"/>
+  <text x="330" y="240" font-family="Arial" font-size="12" font-weight="bold" fill="#228B22">Public Subnet 1B</text>
+  <text x="330" y="255" font-family="Arial" font-size="10" fill="#228B22">10.0.4.0/24</text>
+  
+  <!-- Web Server 2 -->
+  <rect x="370" y="270" width="60" height="40" fill="#87CEEB" stroke="#4682B4" stroke-width="2"/>
+  <text x="400" y="285" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">Web-2</text>
+  <text x="400" y="297" text-anchor="middle" font-family="Arial" font-size="9">Nginx</text>
+  <text x="400" y="308" text-anchor="middle" font-family="Arial" font-size="8">Public IP</text>
+  
+  <!-- NAT Gateway -->
+  <rect x="445" y="270" width="60" height="40" fill="#FFD700" stroke="#FFA500" stroke-width="2"/>
+  <text x="475" y="285" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">NAT</text>
+  <text x="475" y="297" text-anchor="middle" font-family="Arial" font-size="9">Gateway</text>
+  <text x="475" y="308" text-anchor="middle" font-family="Arial" font-size="8">Static IP</text>
+  
+  <!-- Private Subnet 1A -->
+  <rect x="80" y="400" width="200" height="120" fill="#FFE6E6" stroke="#DC143C" stroke-width="2"/>
+  <text x="90" y="420" font-family="Arial" font-size="12" font-weight="bold" fill="#DC143C">Private Subnet 1A</text>
+  <text x="90" y="435" font-family="Arial" font-size="10" fill="#DC143C">10.0.2.0/24</text>
+  
+  <!-- App Server 1 -->
+  <rect x="120" y="450" width="60" height="40" fill="#DDA0DD" stroke="#9370DB" stroke-width="2"/>
+  <text x="150" y="465" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">App-1</text>
+  <text x="150" y="477" text-anchor="middle" font-family="Arial" font-size="9">Tomcat</text>
+  <text x="150" y="488" text-anchor="middle" font-family="Arial" font-size="8">Private IP</text>
+  
+  <!-- Private Subnet 1B -->
+  <rect x="320" y="400" width="200" height="120" fill="#FFE6E6" stroke="#DC143C" stroke-width="2"/>
+  <text x="330" y="420" font-family="Arial" font-size="12" font-weight="bold" fill="#DC143C">Private Subnet 1B</text>
+  <text x="330" y="435" font-family="Arial" font-size="10" fill="#DC143C">10.0.5.0/24</text>
+  
+  <!-- App Server 2 -->
+  <rect x="360" y="450" width="60" height="40" fill="#DDA0DD" stroke="#9370DB" stroke-width="2"/>
+  <text x="390" y="465" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">App-2</text>
+  <text x="390" y="477" text-anchor="middle" font-family="Arial" font-size="9">Tomcat</text>
+  <text x="390" y="488" text-anchor="middle" font-family="Arial" font-size="8">Private IP</text>
+  
+  <!-- Private Subnet 2A -->
+  <rect x="560" y="400" width="180" height="120" fill="#F0E68C" stroke="#DAA520" stroke-width="2"/>
+  <text x="570" y="420" font-family="Arial" font-size="12" font-weight="bold" fill="#DAA520">Private Subnet 2A</text>
+  <text x="570" y="435" font-family="Arial" font-size="10" fill="#DAA520">10.0.3.0/24</text>
+  
+  <!-- Build Server -->
+  <rect x="580" y="450" width="60" height="40" fill="#F4A460" stroke="#D2691E" stroke-width="2"/>
+  <text x="610" y="465" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">Build</text>
+  <text x="610" y="477" text-anchor="middle" font-family="Arial" font-size="9">Maven</text>
+  <text x="610" y="488" text-anchor="middle" font-family="Arial" font-size="8">Private IP</text>
+  
+  <!-- Private Subnet 2B -->
+  <rect x="760" y="400" width="170" height="120" fill="#F0E68C" stroke="#DAA520" stroke-width="2"/>
+  <text x="770" y="420" font-family="Arial" font-size="12" font-weight="bold" fill="#DAA520">Private Subnet 2B</text>
+  <text x="770" y="435" font-family="Arial" font-size="10" fill="#DAA520">10.0.6.0/24</text>
+  
+  <!-- RDS Database -->
+  <rect x="780" y="450" width="60" height="40" fill="#32CD32" stroke="#228B22" stroke-width="2"/>
+  <text x="810" y="465" text-anchor="middle" font-family="Arial" font-size="9" font-weight="bold">RDS</text>
+  <text x="810" y="477" text-anchor="middle" font-family="Arial" font-size="9">MySQL</text>
+  <text x="810" y="488" text-anchor="middle" font-family="Arial" font-size="8">Private</text>
+  
+  <!-- Load Balancer -->
+  <rect x="560" y="220" width="120" height="40" fill="#FF69B4" stroke="#DC143C" stroke-width="2"/>
+  <text x="620" y="238" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold">Application</text>
+  <text x="620" y="252" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold">Load Balancer</text>
+  
+  <!-- Connections -->
+  <!-- Internet to IGW -->
+  <line x1="500" y1="75" x2="500" y2="100" stroke="#4682B4" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- IGW to Public Subnets -->
+  <line x1="480" y1="140" x2="200" y2="220" stroke="#228B22" stroke-width="2"/>
+  <line x1="520" y1="140" x2="400" y2="220" stroke="#228B22" stroke-width="2"/>
+  
+  <!-- Bastion to App Servers (SSH tunnel) -->
+  <line x1="125" y1="310" x2="150" y2="400" stroke="#FF6347" stroke-width="2" stroke-dasharray="3,3"/>
+  <line x1="125" y1="310" x2="390" y2="400" stroke="#FF6347" stroke-width="2" stroke-dasharray="3,3"/>
+  <line x1="125" y1="310" x2="610" y2="400" stroke="#FF6347" stroke-width="2" stroke-dasharray="3,3"/>
+  
+  <!-- Web to App connections -->
+  <line x1="200" y1="310" x2="150" y2="450" stroke="#87CEEB" stroke-width="2"/>
+  <line x1="200" y1="310" x2="390" y2="450" stroke="#87CEEB" stroke-width="2"/>
+  <line x1="400" y1="310" x2="150" y2="450" stroke="#87CEEB" stroke-width="2"/>
+  <line x1="400" y1="310" x2="390" y2="450" stroke="#87CEEB" stroke-width="2"/>
+  
+  <!-- App to Database connections -->
+  <line x1="150" y1="490" x2="780" y2="470" stroke="#DDA0DD" stroke-width="2"/>
+  <line x1="390" y1="490" x2="780" y2="470" stroke="#DDA0DD" stroke-width="2"/>
+  
+  <!-- NAT Gateway to Private Subnets -->
+  <line x1="475" y1="310" x2="180" y2="400" stroke="#FFD700" stroke-width="2"/>
+  <line x1="475" y1="310" x2="420" y2="400" stroke="#FFD700" stroke-width="2"/>
+  <line x1="475" y1="310" x2="650" y2="400" stroke="#FFD700" stroke-width="2"/>
+  
+  <!-- Load Balancer to Web Servers -->
+  <line x1="580" y1="240" x2="230" y2="270" stroke="#FF69B4" stroke-width="2"/>
+  <line x1="660" y1="240" x2="430" y2="270" stroke="#FF69B4" stroke-width="2"/>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4682B4"/>
+    </marker>
+  </defs>
+  
+  <!-- Legend -->
+  <rect x="50" y="550" width="350" height="120" fill="white" stroke="black" stroke-width="1"/>
+  <text x="60" y="570" font-family="Arial" font-size="14" font-weight="bold">Legend:</text>
+  
+  <!-- Legend items -->
+  <rect x="60" y="580" width="15" height="10" fill="#E6FFE6" stroke="#228B22"/>
+  <text x="80" y="590" font-family="Arial" font-size="10">Public Subnets (Web Tier)</text>
+  
+  <rect x="60" y="600" width="15" height="10" fill="#FFE6E6" stroke="#DC143C"/>
+  <text x="80" y="610" font-family="Arial" font-size="10">Private Subnets (App Tier)</text>
+  
+  <rect x="60" y="620" width="15" height="10" fill="#F0E68C" stroke="#DAA520"/>
+  <text x="80" y="630" font-family="Arial" font-size="10">Private Subnets (DB Tier)</text>
+  
+  <line x1="60" y1="645" x2="75" y2="645" stroke="#FF6347" stroke-width="2" stroke-dasharray="3,3"/>
+  <text x="80" y="650" font-family="Arial" font-size="10">SSH Tunnel (via Bastion)</text>
+  
+  <text x="200" y="590" font-family="Arial" font-size="10">🔸 Internet → Web Servers</text>
+  <text x="200" y="610" font-family="Arial" font-size="10">🔸 Web → App Servers</text>
+  <text x="200" y="630" font-family="Arial" font-size="10">🔸 App → Database</text>
+  <text x="200" y="650" font-family="Arial" font-size="10">🔸 Private → Internet (via NAT)</text>
+</svg>

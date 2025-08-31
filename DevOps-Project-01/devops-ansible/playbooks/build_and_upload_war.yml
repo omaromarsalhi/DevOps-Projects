@@ -1,71 +1,94 @@
+---
 - name: Build and upload WAR file from bastion host
   hosts: bastion
   become: true
-  vars:
-    repo_url: "https://github.com/omaromarsalhi/DevOps-Projects.git"
-    repo_dest: "/home/ec2-user"
-    java_repo_name: "Java-Login-App"
-    war_name: "dptweb-1.0.war"
-    s3_bucket: "my-artifacts-java"
-  tasks:
-    - name: Show repo_dest
-      debug:
-        var: repo_dest
 
-    - name: Ensure git and maven are installed
-      yum:
+  tasks:
+    - name: Install build dependencies
+      dnf:
         name:
           - git
           - maven
+          - "{{ java_package }}"
         state: present
 
-    - name: Create repo_dest parent directory
-      file:
-        path: "{{ repo_dest | dirname }}"
-        state: directory
-        mode: "0755"
+    - name: Check if project already exists
+      stat:
+        path: "{{ work_dir }}"
+      register: project_exists
 
-    - name: Clone the monorepo with depth 1
+    - name: Clone repository if not exists
       git:
         repo: "{{ repo_url }}"
-        dest: "{{ repo_dest | dirname }}/repo_tmp"
+        dest: "{{ repo_dest }}/repo_tmp"
         version: master
         depth: 1
-        single_branch: yes
-        force: yes
+        single_branch: true
+        force: true
+      when: not project_exists.stat.exists
 
-    - name: Enable sparse-checkout
-      command: git sparse-checkout init --cone
-      args:
-        chdir: "{{ repo_dest | dirname }}/repo_tmp"
+    - name: Configure sparse checkout for Java app only
+      shell: |
+        cd {{ repo_dest }}/repo_tmp
+        git sparse-checkout init --cone
+        git sparse-checkout set DevOps-Project-01/Java-Login-App
+      when: not project_exists.stat.exists
 
-    - name: Set sparse-checkout to only Java-Login-App
-      command: git sparse-checkout set DevOps-Project-01/Java-Login-App
-      args:
-        chdir: "{{ repo_dest | dirname }}/repo_tmp"
+    - name: Copy Java application to work directory
+      copy:
+        src: "{{ repo_dest }}/repo_tmp/DevOps-Project-01/{{ java_repo_name }}/"
+        dest: "{{ work_dir }}/"
+        remote_src: true
+        mode: preserve
+      when: not project_exists.stat.exists
 
-    - name: Remove existing Java-Login-App directory if present
+    - name: Clean up temporary repository
       file:
-        path: "{{ repo_dest }}/{{ java_repo_name }}"
+        path: "{{ repo_dest }}/repo_tmp"
         state: absent
+      when: not project_exists.stat.exists
 
-    - name: Move Java-Login-App to repo_dest
-      command: mv {{ repo_dest | dirname }}/repo_tmp/DevOps-Project-01/{{ java_repo_name }} {{ repo_dest }}/{{ java_repo_name }}
+    - name: Update application.properties with database config
+      template:
+        src: ../templates/application.properties.j2
+        dest: "{{ work_dir }}/src/main/resources/application.properties"
+        backup: true
 
-    - name: Remove temporary repo_tmp directory
-      file:
-        path: "{{ repo_dest | dirname }}/repo_tmp"
-        state: absent
-
-    - name: Build the WAR file with Maven
-      command: mvn clean package
+    - name: Clean previous build
+      command: mvn clean
       args:
-        chdir: "{{ repo_dest }}/{{ java_repo_name }}"
+        chdir: "{{ work_dir }}"
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-amazon-corretto
+
+    - name: Build WAR file with Maven
+      command: mvn package -DskipTests
+      args:
+        chdir: "{{ work_dir }}"
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-amazon-corretto
+      register: maven_build
+
+    - name: Verify WAR file was created
+      stat:
+        path: "{{ work_dir }}/target/{{ war_name }}"
+      register: war_file
+
+    - name: Fail if WAR file not found
+      fail:
+        msg: "WAR file {{ war_name }} was not created in target directory"
+      when: not war_file.stat.exists
 
     - name: Upload WAR file to S3
       aws_s3:
         bucket: "{{ s3_bucket }}"
         object: "{{ war_name }}"
-        src: "{{ repo_dest }}/{{ java_repo_name }}/target/{{ war_name }}"
+        src: "{{ work_dir }}/target/{{ war_name }}"
         mode: put
-      become: false
+      become_user: ec2-user
+
+    - name: Display build success message
+      debug:
+        msg: 
+          - "WAR file built successfully: {{ war_name }}"
+          - "Uploaded to S3 bucket: {{ s3_bucket }}"

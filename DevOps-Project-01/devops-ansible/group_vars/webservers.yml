@@ -1,0 +1,19 @@
+---
+# Variables specific to web servers (Nginx)
+nginx_conf_dir: /etc/nginx/conf.d
+nginx_log_dir: /var/log/nginx
+nginx_user: nginx
+
+# Backend servers for load balancing
+app_servers:
+  - 10.0.2.89
+  - 10.0.5.242
+
+app_port: 8080
+server_name: _
+nginx_conf_path: "{{ nginx_conf_dir }}/reverse-proxy.conf"
+
+# Performance settings
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+nginx_keepalive_timeout: 65
