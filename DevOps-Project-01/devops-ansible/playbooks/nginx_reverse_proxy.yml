@@ -3,7 +3,11 @@
   hosts: webservers
   become: true
   gather_facts: true
-  
+
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/webservers.yml
+
   tasks:
     - name: Install Nginx
       dnf:

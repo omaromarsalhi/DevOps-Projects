@@ -1,180 +1,219 @@
 ---
-- name: Setup Ansible, AWS CLI, and SSH configuration on bastion host
-  hosts: bastion
+- name: Install Java and Tomcat on app servers
+  hosts: appservers
   become: true
   gather_facts: true
 
-  tasks:
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/appservers.yml
   
-    - name: Update system packages
+  tasks:
+    - name: Install Java (Amazon Corretto 17)
       dnf:
-        name: "*"
-        state: latest
-      tags: [system]
-
-    - name: Install required packages
-      dnf:
-        name: "{{ required_packages }}"
+        name: "{{ java_package }}"
         state: present
-      tags: [packages]
 
-    - name: Check if pip3 is available
-      command: pip3 --version
-      register: pip3_check
+    - name: Create tomcat group
+      group:
+        name: tomcat
+        state: present
+
+    - name: Create tomcat user
+      user:
+        name: tomcat
+        group: tomcat
+        home: "{{ tomcat_install_dir }}"
+        shell: /bin/false
+        system: true
+        state: present
+
+    - name: Get latest Tomcat 9 version from Apache
+      uri:
+        url: https://dlcdn.apache.org/tomcat/tomcat-9/
+        return_content: true
+      register: tomcat9_page
+
+    - name: Extract latest Tomcat 9 version number
+      set_fact:
+        tomcat_version: "{{ tomcat9_page.content | regex_findall('v[0-9]+\\.[0-9]+\\.[0-9]+') | sort | last | regex_replace('^v','') }}"
+
+    - name: Check if Tomcat is already installed
+      stat:
+        path: "{{ tomcat_install_dir }}/bin/catalina.sh"
+      register: tomcat_installed
+
+    - name: Download Tomcat {{ tomcat_version }}
+      get_url:
+        url: "https://dlcdn.apache.org/tomcat/tomcat-{{ tomcat_major }}/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        timeout: 60
+      when: not tomcat_installed.stat.exists
+
+    - name: Extract Tomcat to /opt
+      unarchive:
+        src: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: /opt/
+        remote_src: true
+        creates: "/opt/apache-tomcat-{{ tomcat_version }}"
+      when: not tomcat_installed.stat.exists
+
+    - name: Remove existing Tomcat symlink if present
+      file:
+        path: "{{ tomcat_install_dir }}"
+        state: absent
+      when: not tomcat_installed.stat.exists
+
+    - name: Create symlink for Tomcat
+      file:
+        src: "/opt/apache-tomcat-{{ tomcat_version }}"
+        dest: "{{ tomcat_install_dir }}"
+        state: link
+        force: true
+      when: not tomcat_installed.stat.exists
+
+    - name: Set ownership of actual Tomcat directory
+      file:
+        path: "/opt/apache-tomcat-{{ tomcat_version }}"
+        owner: tomcat
+        group: tomcat
+        recurse: true
+        state: directory
+      when: not tomcat_installed.stat.exists
+
+    - name: Set ownership of symlink
+      file:
+        path: "{{ tomcat_install_dir }}"
+        owner: tomcat
+        group: tomcat
+        state: link
+      when: not tomcat_installed.stat.exists
+
+    - name: Stop Tomcat if running (before service creation)
+      systemd:
+        name: tomcat
+        state: stopped
+      failed_when: false
+      ignore_errors: true
+
+    - name: Create Tomcat systemd service
+      template:
+        src: ../templates/tomcat.service.j2
+        dest: /etc/systemd/system/tomcat.service
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart tomcat
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: true
+
+    - name: Ensure Tomcat scripts are executable
+      file:
+        path: "{{ tomcat_install_dir }}/bin/{{ item }}"
+        mode: '0755'
+        owner: tomcat
+        group: tomcat
+      loop:
+        - catalina.sh
+        - startup.sh
+        - shutdown.sh
+
+    - name: Ensure Tomcat directories have proper permissions
+      file:
+        path: "{{ tomcat_install_dir }}/{{ item }}"
+        owner: tomcat
+        group: tomcat
+        state: directory
+        recurse: true
+      loop:
+        - logs
+        - temp
+        - work
+        - webapps
+
+    - name: Create temp directory if it doesn't exist
+      file:
+        path: "{{ tomcat_install_dir }}/temp"
+        owner: tomcat
+        group: tomcat
+        state: directory
+        mode: '0755'
+
+    - name: Remove any stale PID files
+      file:
+        path: "{{ tomcat_install_dir }}/temp/tomcat.pid"
+        state: absent
+
+    - name: Start and enable Tomcat
+      systemd:
+        name: tomcat
+        state: started
+        enabled: true
+
+    # Enhanced troubleshooting before waiting
+    - name: Check Tomcat service status
+      systemd:
+        name: tomcat
+      register: tomcat_status
+
+    - name: Debug - Show service status
+      debug:
+        var: tomcat_status
+
+    - name: Check Tomcat logs for errors
+      command: journalctl -u tomcat -n 20 --no-pager
+      register: tomcat_logs
+      changed_when: false
+
+    - name: Debug - Show recent Tomcat logs
+      debug:
+        var: tomcat_logs.stdout_lines
+
+    - name: Wait for Tomcat to start (shorter timeout for debugging)
+      wait_for:
+        port: 8080
+        host: 0.0.0.0
+        delay: 10
+        timeout: 45
+      register: port_check
+      failed_when: false
+
+    - name: Debug - Port check result
+      debug:
+        var: port_check
+
+    - name: Check what's listening on port 8080
+      command: netstat -tlnp | grep 8080
+      register: port_listen
       failed_when: false
       changed_when: false
-      tags: [pip]
 
-    - name: Install pip3 manually if not available
-      block:
-        - name: Download get-pip.py
-          get_url:
-            url: https://bootstrap.pypa.io/get-pip.py
-            dest: /tmp/get-pip.py
-            mode: '0644'
-
-        - name: Install pip3 manually
-          command: python3 /tmp/get-pip.py --user
-          become_user: ec2-user
-
-        - name: Clean up get-pip.py
-          file:
-            path: /tmp/get-pip.py
-            state: absent
-      when: pip3_check.rc != 0
-      tags: [pip]
-
-    - name: Add Python bin to PATH for ec2-user
-      lineinfile:
-        path: /home/ec2-user/.bashrc
-        line: 'export PATH=$PATH:~/.local/bin'
-        create: true
-        owner: ec2-user
-        group: ec2-user
-      tags: [environment]
-
-    - name: Download AWS CLI v2
-      get_url:
-        url: "{{ aws_cli_url }}"
-        dest: /tmp/awscliv2.zip
-        timeout: 60
-      tags: [awscli]
-
-    - name: Extract AWS CLI
-      unarchive:
-        src: /tmp/awscliv2.zip
-        dest: /tmp/
-        remote_src: true
-        creates: /tmp/aws
-      tags: [awscli]
-
-    - name: Install AWS CLI
-      command: /tmp/aws/install
-      args:
-        creates: /usr/local/bin/aws
-      tags: [awscli]
-
-    - name: Clean up AWS CLI installation files
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /tmp/awscliv2.zip
-        - /tmp/aws
-      tags: [awscli, cleanup]
-
-    - name: Install Python packages for ec2-user
-      pip:
-        name: "{{ pip_packages }}"
-        executable: pip3
-        extra_args: --user
-      become_user: ec2-user
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/home/ec2-user/.local/bin"
-      tags: [ansible]
-
-    - name: Check if ansible is installed
-      stat:
-        path: /home/ec2-user/.local/bin/ansible
-      register: ansible_installed
-      tags: [ansible]
-
-    - name: Install Ansible collections (optional)
-      command: /home/ec2-user/.local/bin/ansible-galaxy collection install amazon.aws
-      become_user: ec2-user
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/home/ec2-user/.local/bin"
-      when: ansible_installed.stat.exists
-      ignore_errors: true
-      tags: [ansible, collections]
-
-    - name: Create SSH directory for ec2-user
-      file:
-        path: /home/ec2-user/.ssh
-        state: directory
-        owner: ec2-user
-        group: ec2-user
-        mode: '0700'
-      tags: [ssh]
-
-    - name: Create AWS config directory for ec2-user
-      file:
-        path: /home/ec2-user/.aws
-        state: directory
-        owner: ec2-user
-        group: ec2-user
-        mode: '0700'
-      tags: [aws-config]
-
-    - name: Verify AWS CLI installation
-      command: aws --version
-      register: aws_version
-      changed_when: false
-      tags: [verification]
-
-    - name: Verify Python installation
-      command: python3 --version
-      register: python_version
-      changed_when: false
-      tags: [verification]
-
-    - name: Verify pip3 installation
-      command: pip3 --version
-      register: pip_version
-      changed_when: false
-      become_user: ec2-user
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/home/ec2-user/.local/bin"
-      tags: [verification]
-
-    - name: Verify Ansible installation
-      command: /home/ec2-user/.local/bin/ansible --version
-      register: ansible_version
-      changed_when: false
-      become_user: ec2-user
-      when: ansible_installed.stat.exists
-      tags: [verification]
-
-    - name: Display installation results
+    - name: Debug - Port listening status
       debug:
-        msg:
-          - "==================================="
-          - "INSTALLATION VERIFICATION"
-          - "==================================="
-          - "AWS CLI: {{ aws_version.stdout }}"
-          - "Python: {{ python_version.stdout }}"
-          - "pip3: {{ pip_version.stdout }}"
-          - "Ansible: {{ ansible_version.stdout | default('Not installed or not found') }}"
-          - "==================================="
-          - "NEXT STEPS:"
-          - "1. Configure AWS CLI: aws configure"
-          - "2. Copy SSH key to /home/ec2-user/.ssh/devops-p1-keypair.pem"
-          - "3. Set key permissions: chmod 400 ~/.ssh/devops-p1-keypair.pem"
-          - "4. Test Ansible: ansible --version"
-          - "==================================="
-      tags: [verification]
+        var: port_listen.stdout_lines
+
+    - name: Verify Tomcat is running (if port is available)
+      uri:
+        url: "http://localhost:8080"
+        method: GET
+        status_code: 200
+      retries: 3
+      delay: 5
+      when: port_check.elapsed is defined and port_check.elapsed < 45
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        state: absent
 
   handlers:
-    - name: Source bashrc
-      shell: source /home/ec2-user/.bashrc
-      become_user: ec2-user
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+    
+    - name: Restart tomcat
+      systemd:
+        name: tomcat
+        state: restarted

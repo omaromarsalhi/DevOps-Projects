@@ -6,8 +6,8 @@ nginx_user: nginx
 
 # Backend servers for load balancing
 app_servers:
-  - 10.0.2.89
-  - 10.0.5.242
+  - 10.0.2.16
+  - 10.0.5.17
 
 app_port: 8080
 server_name: _

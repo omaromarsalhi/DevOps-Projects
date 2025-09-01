@@ -3,6 +3,10 @@
   hosts: bastion
   become: true
 
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/bastion.yml
+
   tasks:
     - name: Install MySQL client
       dnf:

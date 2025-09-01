@@ -277,6 +277,11 @@ Resources:
           ToPort: 3306
           SourceSecurityGroupId: !Ref PrivateSecurityGroup
           Description: "MySQL access from app servers"
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !Sub "${BastionHost.PrivateIp}/32"
+          Description: "MySQL access from bastion host"
       SecurityGroupEgress:
         - IpProtocol: "-1"
           CidrIp: "0.0.0.0/0"
@@ -359,6 +364,28 @@ Resources:
       Tags:
         - Key: "Name"
           Value: "bastion-host"
+
+  # S3 Bucket for Java Artifacts
+  JavaArtifactsBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: "my-java-artifacts-fools"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: "Name"
+          Value: "my-java-artifacts-fools"
+        - Key: "Purpose"
+          Value: "Java Application Artifacts"
 
   # DB Subnet Group
   DBSubnetGroup:

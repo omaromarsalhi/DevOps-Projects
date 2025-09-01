@@ -1,7 +1,7 @@
 ---
 # Global variables for all hosts
 ansible_user: ec2-user
-ansible_ssh_private_key_file: ../devops-p1-keypair.pem
+ansible_ssh_private_key_file: /home/ec2-user/.ssh/devops-p1-keypair.pem
 
 # Common packages for setup
 required_packages:
@@ -10,7 +10,7 @@ required_packages:
   - git
   - wget
   - unzip
-  - curl
+
 
 # Python packages for Ansible
 pip_packages:
@@ -34,20 +34,20 @@ java_home: /usr/lib/jvm/java-17-amazon-corretto
 app_name: dptweb
 app_version: "1.0"
 war_name: "{{ app_name }}-{{ app_version }}.war"
-s3_bucket: my-java-artifacts-1
+s3_bucket: my-java-artifacts-fools
 
 # Repository configuration
 repo_url: "https://github.com/omaromarsalhi/DevOps-Projects.git"
 java_project_path: "DevOps-Project-01/Java-Login-App"
 
-# Database configuration (credentials from vault)
-db_host: loginapp.czcyfkxgylmh.us-east-1.rds.amazonaws.com
+# Database configuration
+db_host: 
 db_name: loginapp
 db_port: 3306
-db_user: "{{ vault_db_user | default('admin') }}"
-db_password: "{{ vault_db_password | default('CHANGE_ME') }}"
+db_user: 
+db_password: 
 
-# AWS credentials (from vault or better: use IAM roles)
-aws_access_key_id: "{{ vault_aws_access_key_id | default('') }}"
-aws_secret_access_key: "{{ vault_aws_secret_access_key | default('') }}"
-aws_session_token: "{{ vault_aws_session_token | default('') }}"
+# AWS credentials (update with your current credentials)
+aws_access_key_id: 
+aws_secret_access_key: 
+aws_session_token: 

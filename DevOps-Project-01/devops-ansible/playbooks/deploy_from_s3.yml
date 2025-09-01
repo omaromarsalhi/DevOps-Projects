@@ -3,6 +3,10 @@
   hosts: appservers
   become: true
 
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/appservers.yml
+
   tasks:
     - name: Install required packages for S3 access
       dnf:

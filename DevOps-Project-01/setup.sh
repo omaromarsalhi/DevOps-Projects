@@ -1,10 +1,16 @@
 #!/bin/bash
 
-# Fixed Setup Script for Amazon Linux 2023
+# Setup Script for Amazon Linux 2023
 # Installs Ansible, AWS CLI, and configures SSH
+# 
+# IMPORTANT: Run this script BEFORE executing any Ansible playbooks
+# This installs Ansible and its dependencies on the local system
+#
+# Usage: ./setup.sh
+# After running, source ~/.bashrc to update PATH
 
 echo "==================================="
-echo "Fixed Setup: Ansible + AWS CLI + SSH"
+echo "Setup: Ansible + AWS CLI + SSH"
 echo "==================================="
 
 # Update system

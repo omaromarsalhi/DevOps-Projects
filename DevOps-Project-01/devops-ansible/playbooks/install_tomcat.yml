@@ -1,10 +1,340 @@
+# ---
+# - name: Install Java and Tomcat on app servers
+#   hosts: appservers
+#   become: true
+#   gather_facts: true
+
+#   vars_files:
+#     - ../group_vars/all.yml
+#     - ../group_vars/appservers.yml
+    
+#   tasks:
+#     # Uninstall existing Tomcat if present
+#     - name: Check if Tomcat service exists
+#       stat:
+#         path: /etc/systemd/system/tomcat.service
+#       register: tomcat_service_exists
+
+#     - name: Stop Tomcat service if running
+#       systemd:
+#         name: tomcat
+#         state: stopped
+#       when: tomcat_service_exists.stat.exists
+#       failed_when: false
+#       ignore_errors: true
+
+#     - name: Disable Tomcat service if exists
+#       systemd:
+#         name: tomcat
+#         enabled: false
+#       when: tomcat_service_exists.stat.exists
+#       failed_when: false
+#       ignore_errors: true
+
+#     - name: Remove existing Tomcat systemd service file
+#       file:
+#         path: /etc/systemd/system/tomcat.service
+#         state: absent
+
+#     - name: Kill any remaining Tomcat processes
+#       shell: |
+#         if pgrep -f tomcat > /dev/null 2>&1; then
+#           pkill -f tomcat
+#           sleep 2
+#           # Force kill if still running
+#           if pgrep -f tomcat > /dev/null 2>&1; then
+#             pkill -9 -f tomcat
+#           fi
+#         fi
+#       failed_when: false
+#       changed_when: false
+
+#     - name: Find and remove existing Tomcat directories
+#       find:
+#         paths: /opt
+#         patterns: "apache-tomcat-*"
+#         file_type: directory
+#       register: existing_tomcat_dirs
+
+#     - name: Remove existing Tomcat directories
+#       file:
+#         path: "{{ item.path }}"
+#         state: absent
+#       loop: "{{ existing_tomcat_dirs.files }}"
+#       when: existing_tomcat_dirs.files is defined
+
+#     - name: Forcefully remove any existing /opt/tomcat (directory or symlink)
+#       command: rm -rf {{ tomcat_install_dir }}
+
+#     - name: Remove existing tomcat user
+#       user:
+#         name: tomcat
+#         state: absent
+#         remove: true
+#       failed_when: false
+#       ignore_errors: true
+
+#     - name: Remove existing tomcat group
+#       group:
+#         name: tomcat
+#         state: absent
+#       failed_when: false
+#       ignore_errors: true
+
+#     - name: Reload systemd daemon after cleanup
+#       systemd:
+#         daemon_reload: true
+
+#     # Fresh installation starts here
+#     - name: Install Java (Amazon Corretto 17)
+#       dnf:
+#         name: "{{ java_package }}"
+#         state: present
+
+#     - name: Create tomcat group
+#       group:
+#         name: tomcat
+#         state: present
+
+#     - name: Create tomcat user
+#       user:
+#         name: tomcat
+#         group: tomcat
+#         home: /home/tomcat
+#         shell: /bin/false
+#         system: true
+#         state: present
+
+#     - name: Get latest Tomcat 9 version from Apache
+#       uri:
+#         url: https://dlcdn.apache.org/tomcat/tomcat-9/
+#         return_content: true
+#       register: tomcat9_page
+
+#     - name: Extract latest Tomcat 9 version number
+#       set_fact:
+#         tomcat_version: "{{ tomcat9_page.content | regex_findall('v[0-9]+\\.[0-9]+\\.[0-9]+') | sort | last | regex_replace('^v','') }}"
+
+#     - name: Download Tomcat {{ tomcat_version }}
+#       get_url:
+#         url: "https://dlcdn.apache.org/tomcat/tomcat-{{ tomcat_major }}/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
+#         dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+#         timeout: 60
+
+#     - name: Extract Tomcat to /opt
+#       unarchive:
+#         src: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+#         dest: /opt/
+#         remote_src: true
+#         creates: "/opt/apache-tomcat-{{ tomcat_version }}"
+
+#     - name: Create symlink for Tomcat (ensure target doesn't exist first)
+#       shell: |
+#         rm -rf {{ tomcat_install_dir }}
+#         ln -sf /opt/apache-tomcat-{{ tomcat_version }} {{ tomcat_install_dir }}
+
+#     - name: Verify symlink was created correctly
+#       command: ls -la {{ tomcat_install_dir }}
+#       register: symlink_check
+#       changed_when: false
+
+#     - name: Debug - Show symlink status
+#       debug:
+#         var: symlink_check.stdout_lines
+
+#     - name: Verify Tomcat scripts exist via symlink
+#       command: ls -la {{ tomcat_install_dir }}/bin/
+#       register: symlink_scripts_check
+#       changed_when: false
+
+#     - name: Debug - Show scripts accessible via symlink
+#       debug:
+#         var: symlink_scripts_check.stdout_lines
+
+#     - name: Set ownership of actual Tomcat directory
+#       file:
+#         path: "/opt/apache-tomcat-{{ tomcat_version }}"
+#         owner: tomcat
+#         group: tomcat
+#         recurse: true
+#         state: directory
+
+#     - name: Set ownership of symlink using command
+#       command: chown -h tomcat:tomcat {{ tomcat_install_dir }}
+
+#     - name: Ensure Tomcat scripts are executable (using actual path first)
+#       file:
+#         path: "/opt/apache-tomcat-{{ tomcat_version }}/bin/{{ item }}"
+#         mode: '0755'
+#         owner: tomcat
+#         group: tomcat
+#       loop:
+#         - catalina.sh
+#         - startup.sh
+#         - shutdown.sh
+
+#     - name: Ensure Tomcat directories have proper permissions
+#       file:
+#         path: "{{ tomcat_install_dir }}/{{ item }}"
+#         owner: tomcat
+#         group: tomcat
+#         state: directory
+#         recurse: true
+#       loop:
+#         - logs
+#         - temp
+#         - work
+#         - webapps
+
+#     - name: Create Tomcat systemd service
+#       template:
+#         src: ../templates/tomcat.service.j2
+#         dest: /etc/systemd/system/tomcat.service
+#         mode: '0644'
+#       notify:
+#         - Reload systemd
+#         - Restart tomcat
+
+#     - name: Reload systemd daemon
+#       systemd:
+#         daemon_reload: true
+
+#     - name: Start and enable Tomcat
+#       systemd:
+#         name: tomcat
+#         state: started
+#         enabled: true
+
+#     - name: Wait for Tomcat to start
+#       wait_for:
+#         port: 8080
+#         host: 0.0.0.0
+#         delay: 15
+#         timeout: 90
+
+#     - name: Verify Tomcat is running
+#       uri:
+#         url: "http://localhost:8080"
+#         method: GET
+#         status_code: 200
+#       retries: 3
+#       delay: 5
+
+#     - name: Clean up downloaded archive
+#       file:
+#         path: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+#         state: absent
+
+#   handlers:
+#     - name: Reload systemd
+#       systemd:
+#         daemon_reload: true
+    
+#     - name: Restart tomcat
+#       systemd:
+#         name: tomcat
+#         state: restarted
+
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 - name: Install Java and Tomcat on app servers
   hosts: appservers
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/appservers.yml
+    
   tasks:
+    # Uninstall existing Tomcat if present
+    - name: Check if Tomcat service exists
+      stat:
+        path: /etc/systemd/system/tomcat.service
+      register: tomcat_service_exists
+
+    - name: Stop Tomcat service if running
+      systemd:
+        name: tomcat
+        state: stopped
+      when: tomcat_service_exists.stat.exists
+      failed_when: false
+      ignore_errors: true
+
+    - name: Disable Tomcat service if exists
+      systemd:
+        name: tomcat
+        enabled: false
+      when: tomcat_service_exists.stat.exists
+      failed_when: false
+      ignore_errors: true
+
+    - name: Remove existing Tomcat systemd service file
+      file:
+        path: /etc/systemd/system/tomcat.service
+        state: absent
+
+    - name: Kill any remaining Tomcat processes
+      shell: |
+        if pgrep -f tomcat > /dev/null 2>&1; then
+          pkill -f tomcat
+          sleep 2
+          # Force kill if still running
+          if pgrep -f tomcat > /dev/null 2>&1; then
+            pkill -9 -f tomcat
+          fi
+        fi
+      failed_when: false
+      changed_when: false
+
+    - name: Find and remove existing Tomcat directories
+      find:
+        paths: /opt
+        patterns: "apache-tomcat-*"
+        file_type: directory
+      register: existing_tomcat_dirs
+
+    - name: Remove existing Tomcat directories
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ existing_tomcat_dirs.files }}"
+      when: existing_tomcat_dirs.files is defined
+
+    - name: Forcefully remove any existing /opt/tomcat (directory or symlink)
+      command: rm -rf {{ tomcat_install_dir }}
+
+    - name: Remove existing tomcat user
+      user:
+        name: tomcat
+        state: absent
+        remove: true
+      failed_when: false
+      ignore_errors: true
+
+    - name: Remove existing tomcat group
+      group:
+        name: tomcat
+        state: absent
+      failed_when: false
+      ignore_errors: true
+
+    - name: Reload systemd daemon after cleanup
+      systemd:
+        daemon_reload: true
+
+    # Fresh installation starts here
     - name: Install Java (Amazon Corretto 17)
       dnf:
         name: "{{ java_package }}"
@@ -19,7 +349,7 @@
       user:
         name: tomcat
         group: tomcat
-        home: "{{ tomcat_install_dir }}"
+        home: /home/tomcat
         shell: /bin/false
         system: true
         state: present
@@ -34,17 +364,11 @@
       set_fact:
         tomcat_version: "{{ tomcat9_page.content | regex_findall('v[0-9]+\\.[0-9]+\\.[0-9]+') | sort | last | regex_replace('^v','') }}"
 
-    - name: Check if Tomcat is already installed
-      stat:
-        path: "{{ tomcat_install_dir }}/bin/catalina.sh"
-      register: tomcat_installed
-
     - name: Download Tomcat {{ tomcat_version }}
       get_url:
         url: "https://dlcdn.apache.org/tomcat/tomcat-{{ tomcat_major }}/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
         dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
         timeout: 60
-      when: not tomcat_installed.stat.exists
 
     - name: Extract Tomcat to /opt
       unarchive:
@@ -52,23 +376,46 @@
         dest: /opt/
         remote_src: true
         creates: "/opt/apache-tomcat-{{ tomcat_version }}"
-      when: not tomcat_installed.stat.exists
 
     - name: Create symlink for Tomcat
-      file:
-        src: "/opt/apache-tomcat-{{ tomcat_version }}"
-        dest: "{{ tomcat_install_dir }}"
-        state: link
-        force: true
-      when: not tomcat_installed.stat.exists
+      shell: |
+        rm -rf {{ tomcat_install_dir }}
+        ln -sf /opt/apache-tomcat-{{ tomcat_version }} {{ tomcat_install_dir }}
 
-    - name: Set ownership of Tomcat directory
+    - name: Set ownership of actual Tomcat directory
       file:
-        path: "{{ tomcat_install_dir }}"
+        path: "/opt/apache-tomcat-{{ tomcat_version }}"
         owner: tomcat
         group: tomcat
         recurse: true
-      when: not tomcat_installed.stat.exists
+        state: directory
+
+    - name: Set ownership of symlink
+      command: chown -h tomcat:tomcat {{ tomcat_install_dir }}
+
+    - name: Ensure Tomcat scripts are executable
+      file:
+        path: "/opt/apache-tomcat-{{ tomcat_version }}/bin/{{ item }}"
+        mode: '0755'
+        owner: tomcat
+        group: tomcat
+      loop:
+        - catalina.sh
+        - startup.sh
+        - shutdown.sh
+
+    - name: Ensure Tomcat directories have proper permissions
+      file:
+        path: "{{ tomcat_install_dir }}/{{ item }}"
+        owner: tomcat
+        group: tomcat
+        state: directory
+        recurse: true
+      loop:
+        - logs
+        - temp
+        - work
+        - webapps
 
     - name: Create Tomcat systemd service
       template:
@@ -79,18 +426,22 @@
         - Reload systemd
         - Restart tomcat
 
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: true
+
     - name: Start and enable Tomcat
       systemd:
         name: tomcat
         state: started
         enabled: true
-        daemon_reload: true
 
     - name: Wait for Tomcat to start
       wait_for:
         port: 8080
-        delay: 10
-        timeout: 60
+        host: 0.0.0.0
+        delay: 15
+        timeout: 90
 
     - name: Verify Tomcat is running
       uri:
