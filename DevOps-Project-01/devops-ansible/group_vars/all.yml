@@ -11,7 +11,6 @@ required_packages:
   - wget
   - unzip
 
-
 # Python packages for Ansible
 pip_packages:
   - ansible
@@ -34,7 +33,7 @@ java_home: /usr/lib/jvm/java-17-amazon-corretto
 app_name: dptweb
 app_version: "1.0"
 war_name: "{{ app_name }}-{{ app_version }}.war"
-s3_bucket: my-java-artifacts-fools
+s3_bucket: 
 
 # Repository configuration
 repo_url: "https://github.com/omaromarsalhi/DevOps-Projects.git"
@@ -49,6 +48,6 @@ db_password:
 
 # AWS credentials (update with your current credentials)
 
-aws_access_key_id: 
-aws_secret_access_key: 
-aws_session_token: 
+aws_access_key_id : 
+aws_secret_access_key : 
+aws_session_token : 

@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Complete 3-Tier Infrastructure'
+Description: 'Complete 3-Tier Infrastructure with Load Balancer'
 
 Parameters:
   KeyName:
@@ -36,6 +36,240 @@ Resources:
       Tags:
         - Key: "Name"
           Value: "devops_p1_vpc"
+
+  # Network ACLs
+  PublicNetworkAcl:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId: !Ref EC2VPC
+      Tags:
+        - Key: "Name"
+          Value: "pub_sub_acl"
+
+  PrivateNetworkAcl:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId: !Ref EC2VPC
+      Tags:
+        - Key: "Name"
+          Value: "prv_sub_acl"
+
+  RDSNetworkAcl:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId: !Ref EC2VPC
+      Tags:
+        - Key: "Name"
+          Value: "rds_acl"
+
+  # Public Network ACL Rules
+  PublicNetworkAclEntryInboundHTTP:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 80
+        To: 80
+
+  PublicNetworkAclEntryInboundHTTPS:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 110
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 443
+        To: 443
+
+  PublicNetworkAclEntryInboundSSH:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 22
+        To: 22
+
+  PublicNetworkAclEntryInboundEphemeral:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 130
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 1024
+        To: 65535
+
+  PublicNetworkAclEntryOutbound:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      Egress: true
+
+  # Private Network ACL Rules (App Tier - subnets 10.0.2.0/24 & 10.0.5.0/24)
+  PrivateNetworkAclEntryInboundFromPublic1:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: "10.0.1.0/24"  # From Public Subnet 1a
+
+  PrivateNetworkAclEntryInboundFromPublic2:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: 110
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: "10.0.4.0/24"  # From Public Subnet 1b
+
+  PrivateNetworkAclEntryInboundFromBastion:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "10.0.1.0/24"  # SSH from Bastion in Public Subnet 1a
+      PortRange:
+        From: 22
+        To: 22
+
+  PrivateNetworkAclEntryInboundEphemeral:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: 130
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 1024
+        To: 65535
+
+  PrivateNetworkAclEntryOutbound:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      Egress: true
+
+  # RDS Network ACL Rules (DB Tier - subnets 10.0.3.0/24 & 10.0.6.0/24)
+  RDSNetworkAclEntryInboundMySQLFromApp1:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref RDSNetworkAcl
+      RuleNumber: 100
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "10.0.2.0/24"  # From App Subnet 1a
+      PortRange:
+        From: 3306
+        To: 3306
+
+  RDSNetworkAclEntryInboundMySQLFromApp2:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref RDSNetworkAcl
+      RuleNumber: 110
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "10.0.5.0/24"  # From App Subnet 1b
+      PortRange:
+        From: 3306
+        To: 3306
+
+  RDSNetworkAclEntryInboundMySQLFromBastion:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref RDSNetworkAcl
+      RuleNumber: 120
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "10.0.1.0/24"  # From Bastion in Public Subnet 1a
+      PortRange:
+        From: 3306
+        To: 3306
+
+  RDSNetworkAclEntryInboundEphemeral:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref RDSNetworkAcl
+      RuleNumber: 130
+      Protocol: 6
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      PortRange:
+        From: 1024
+        To: 65535
+
+  RDSNetworkAclEntryOutbound:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref RDSNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: "0.0.0.0/0"
+      Egress: true
+
+  # Network ACL Associations
+  PublicSubnet1aNetworkAclAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet1a
+      NetworkAclId: !Ref PublicNetworkAcl
+
+  PublicSubnet1bNetworkAclAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet1b
+      NetworkAclId: !Ref PublicNetworkAcl
+
+  PrivateSubnet1aNetworkAclAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet1a
+      NetworkAclId: !Ref PrivateNetworkAcl
+
+  PrivateSubnet1bNetworkAclAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet1b
+      NetworkAclId: !Ref PrivateNetworkAcl
+
+  PrivateSubnet2aNetworkAclAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet2a
+      NetworkAclId: !Ref RDSNetworkAcl
+
+  PrivateSubnet2bNetworkAclAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet2b
+      NetworkAclId: !Ref RDSNetworkAcl
+
   # Internet Gateway
   EC2InternetGateway:
     Type: "AWS::EC2::InternetGateway"
@@ -216,7 +450,38 @@ Resources:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
       GroupName: "pub_subs_sg"
-      GroupDescription: "Security group for public subnets"
+      GroupDescription: "Security group for public subnets (web servers)"
+      VpcId: !Ref EC2VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+          Description: "SSH access from bastion host"
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: "HTTP access from ALB"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: "HTTPS access from ALB"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+          Description: "All outbound traffic"
+      Tags:
+        - Key: "Name"
+          Value: "pub_subs_sg"
+
+  # NEW: Bastion Security Group
+  BastionSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "bastion_sg"
+      GroupDescription: "Security group for bastion host"
       VpcId: !Ref EC2VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -224,6 +489,21 @@ Resources:
           ToPort: 22
           CidrIp: "0.0.0.0/0"
           Description: "SSH access"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: "Name"
+          Value: "bastion_sg"
+
+  # NEW: ALB Security Group
+  ALBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "alb_sg"
+      GroupDescription: "Security group for Application Load Balancer"
+      VpcId: !Ref EC2VPC
+      SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -235,32 +515,36 @@ Resources:
           CidrIp: "0.0.0.0/0"
           Description: "HTTPS access"
       SecurityGroupEgress:
-        - IpProtocol: "-1"
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
           CidrIp: "0.0.0.0/0"
+          Description: "HTTP to targets"
       Tags:
         - Key: "Name"
-          Value: "pub_subs_sg"
+          Value: "alb_sg"
 
   PrivateSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
       GroupName: "prv_sub_sg"
-      GroupDescription: "Security group for private subnets"
+      GroupDescription: "Security group for private subnets (app servers)"
       VpcId: !Ref EC2VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          SourceSecurityGroupId: !Ref PublicSecurityGroup
-          Description: "SSH from public subnets"
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+          Description: "SSH from bastion host"
         - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
+          FromPort: 0
+          ToPort: 65535
           SourceSecurityGroupId: !Ref PublicSecurityGroup
-          Description: "Tomcat from web servers"
+          Description: "Any TCP from web servers"
       SecurityGroupEgress:
         - IpProtocol: "-1"
           CidrIp: "0.0.0.0/0"
+          Description: "All outbound traffic"
       Tags:
         - Key: "Name"
           Value: "prv_sub_sg"
@@ -280,7 +564,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          CidrIp: !Sub "${BastionHost.PrivateIp}/32"
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
           Description: "MySQL access from bastion host"
       SecurityGroupEgress:
         - IpProtocol: "-1"
@@ -289,7 +573,76 @@ Resources:
         - Key: "Name"
           Value: "rds_sg"
 
-  # Web Server Instances (basic, no launch templates)
+  # NEW: Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: "devops-1-alb"
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1a
+        - !Ref PublicSubnet1b
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "60"
+        - Key: deletion_protection.enabled
+          Value: "false"
+      Tags:
+        - Key: "Name"
+          Value: "devops-1-alb"
+
+  # NEW: Target Group for Web Servers
+  WebServersTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      Name: "web-servers-tg"
+      Protocol: HTTP
+      Port: 80
+      VpcId: !Ref EC2VPC
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: "/"
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: "200"
+      Targets:
+        - Id: !Ref WebServer1
+          Port: 80
+        - Id: !Ref WebServer2
+          Port: 80
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "300"
+        - Key: stickiness.enabled
+          Value: "false"
+        - Key: stickiness.type
+          Value: "lb_cookie"
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: "86400"
+      Tags:
+        - Key: "Name"
+          Value: "web-servers-tg"
+
+  # NEW: ALB Listener
+  ALBListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebServersTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Web Server Instances
   WebServer1:
     Type: "AWS::EC2::Instance"
     Properties:
@@ -320,7 +673,7 @@ Resources:
         - Key: "Tier"
           Value: "Web"
 
-  # App Server Instances (basic, no launch templates)
+  # App Server Instances
   AppServer1:
     Type: "AWS::EC2::Instance"
     Properties:
@@ -351,7 +704,7 @@ Resources:
         - Key: "Tier"
           Value: "Application"
 
-  # Bastion Host
+  # Bastion Host - Updated to use new security group
   BastionHost:
     Type: "AWS::EC2::Instance"
     Properties:
@@ -359,7 +712,7 @@ Resources:
       InstanceType: t3.medium
       KeyName: !Ref KeyName
       SecurityGroupIds:
-        - !Ref PublicSecurityGroup
+        - !Ref BastionSecurityGroup
       SubnetId: !Ref PublicSubnet1a
       Tags:
         - Key: "Name"
@@ -369,7 +722,7 @@ Resources:
   JavaArtifactsBucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: "my-java-artifacts-fools"
+      BucketName: !Sub "my-java-artifacts-${AWS::StackName}-${AWS::AccountId}"
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -455,3 +808,16 @@ Outputs:
     Value: !GetAtt RDSDatabase.Endpoint.Address
     Export:
       Name: !Sub "${AWS::StackName}-RDS-Endpoint"
+
+  # NEW: Load Balancer DNS Name
+  LoadBalancerDNS:
+    Description: "Application Load Balancer DNS Name"
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-ALB-DNS"
+
+  LoadBalancerArn:
+    Description: "Application Load Balancer ARN"
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub "${AWS::StackName}-ALB-ARN"
