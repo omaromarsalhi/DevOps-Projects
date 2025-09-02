@@ -107,6 +107,9 @@
   <!-- Internet to IGW -->
   <line x1="500" y1="75" x2="500" y2="100" stroke="#4682B4" stroke-width="2" marker-end="url(#arrowhead)"/>
   
+  <!-- IGW to Load Balancer -->
+  <line x1="500" y1="140" x2="620" y2="220" stroke="#FF69B4" stroke-width="3" marker-end="url(#arrowhead)"/>
+  
   <!-- IGW to Public Subnets -->
   <line x1="480" y1="140" x2="200" y2="220" stroke="#228B22" stroke-width="2"/>
   <line x1="520" y1="140" x2="400" y2="220" stroke="#228B22" stroke-width="2"/>
@@ -159,8 +162,10 @@
   <line x1="60" y1="645" x2="75" y2="645" stroke="#FF6347" stroke-width="2" stroke-dasharray="3,3"/>
   <text x="80" y="650" font-family="Arial" font-size="10">SSH Tunnel (via Bastion)</text>
   
-  <text x="200" y="590" font-family="Arial" font-size="10">🔸 Internet → Web Servers</text>
-  <text x="200" y="610" font-family="Arial" font-size="10">🔸 Web → App Servers</text>
-  <text x="200" y="630" font-family="Arial" font-size="10">🔸 App → Database</text>
-  <text x="200" y="650" font-family="Arial" font-size="10">🔸 Private → Internet (via NAT)</text>
+  <text x="200" y="590" font-family="Arial" font-size="10">🔸 Internet → Load Balancer</text>
+  <text x="200" y="610" font-family="Arial" font-size="10">🔸 Load Balancer → Web Servers</text>
+  <text x="200" y="630" font-family="Arial" font-size="10">🔸 Web → App Servers</text>
+  <text x="200" y="650" font-family="Arial" font-size="10">🔸 App → Database</text>
+  
+  <text x="60" y="665" font-family="Arial" font-size="10">🔸 Private → Internet (via NAT)</text>
 </svg>
